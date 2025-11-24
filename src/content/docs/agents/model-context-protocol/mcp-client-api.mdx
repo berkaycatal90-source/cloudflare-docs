@@ -250,7 +250,7 @@ Starting from version 0.0.24, the connection flow includes a new `connected` sta
 
 ### `discoverIfConnected()`
 
-Discover server capabilities if the connection is in the `connected` state. This method transitions the connection from `connected` to `discovering` to `ready`.
+Discover or refresh server capabilities for a connected MCP server. This method transitions the connection from `connected` or `ready` state to `discovering` state, then fetches available tools, resources, and prompts from the server.
 
 ```ts
 async discoverIfConnected(serverId: string): Promise<void>
@@ -287,7 +287,13 @@ export class MyAgent extends Agent<Env, never> {
 
 </TypeScriptExample>
 
-This method is useful for refreshing server capabilities (for example, from a UI refresh button) or when you need to manually trigger discovery after a connection has been established.
+This method is useful for:
+
+- Refreshing server capabilities after a server update
+- Implementing a manual refresh button in your UI
+- Re-discovering capabilities if they were not loaded during initial connection
+
+The method only performs discovery if the connection is in `connected` or `ready` state. If the connection is in any other state (such as `authenticating`, `connecting`, or `failed`), the method will skip discovery and emit an observability event.
 
 :::note[Automatic Discovery]
 
@@ -315,6 +321,42 @@ export class MyAgent extends Agent<Env, never> {
 </TypeScriptExample>
 
 You can also provide a `customHandler` function for full control over the callback response. Refer to the [OAuth handling guide](/agents/guides/oauth-mcp-client) for details.
+
+## Connection State Machine
+
+MCP connections follow a well-defined state machine to manage the connection lifecycle:
+
+**Non-OAuth flow:**
+1. **`connecting`** — Transport connection establishing
+2. **`connected`** — Transport established, awaiting capability discovery
+3. **`discovering`** — Fetching server capabilities (tools, resources, prompts)
+4. **`ready`** — Fully operational with all capabilities available
+
+**OAuth flow:**
+1. **`authenticating`** — User must complete OAuth authorization
+2. **`connecting`** — Transport connection establishing (after OAuth callback)
+3. **`connected`** — Transport established, awaiting capability discovery
+4. **`discovering`** — Fetching server capabilities (tools, resources, prompts)
+5. **`ready`** — Fully operational with all capabilities available
+
+Any state can transition to **`failed`** if an error occurs during the connection process.
+
+:::note[Breaking Change in Connection Flow]
+
+Starting from version 0.0.24, the connection establishment and capability discovery are separated into distinct steps:
+
+**What changed:**
+
+- `ClientConnection.init()` no longer automatically discovers capabilities
+- A new `connected` state indicates when transport is established but capabilities have not been discovered yet
+- Discovery now happens via `discoverIfConnected()` which is called automatically by `addMcpServer()` for non-OAuth connections
+- For OAuth connections, `establishConnection()` handles both connection and discovery after authorization completes
+
+**Migration:**
+
+Most users will not need to change their code, as the `Agent` class handles discovery automatically. However, if you are using the lower-level `MCPClientManager` API directly, you must call `discoverIfConnected()` after establishing a connection.
+
+:::
 
 ## Error Handling
 
