@@ -1,0 +1,47 @@
+---
+title: MCP connection state improvements and discovery enhancements
+description: Introduces new connection state enum, improved error handling with fail-fast discovery, and better control over capability discovery
+products:
+  - agents
+  - workers
+date: 2025-11-24
+---
+
+The latest release of [@cloudflare/agents](https://github.com/cloudflare/agents) brings improvements to MCP connection state management and tool discovery:
+
+## New connection state enum
+
+MCP connection states are now standardized with the `MCPConnectionState` enum, making connection lifecycle more predictable:
+
+- **`AUTHENTICATING`** — Waiting for OAuth authorization
+- **`CONNECTING`** — Establishing transport connection
+- **`CONNECTED`** — Transport connected, capabilities not yet discovered
+- **`DISCOVERING`** — Fetching server capabilities (tools, resources, prompts)
+- **`READY`** — Fully connected with all capabilities available
+- **`FAILED`** — Connection failed
+
+The new `CONNECTED` state distinguishes between transport connection and capability discovery, allowing better control over when tool discovery occurs.
+
+## Improved discovery control
+
+A new `discoverIfConnected()` method on `MCPClientManager` provides explicit control over capability discovery:
+
+```ts
+// Connect to server (establishes transport)
+await this.mcp.connectToServer(id);
+
+// Explicitly discover capabilities when ready
+await this.mcp.discoverIfConnected(id);
+```
+
+This separation allows you to control when tool discovery happens, which is useful for managing connection lifecycle in complex scenarios like OAuth flows.
+
+## Fail-fast error handling
+
+MCP client discovery now uses `Promise.all()` instead of `Promise.allSettled()`, throwing errors immediately if capability discovery fails. This fail-fast behavior helps catch configuration issues early and ensures reliable tool discovery.
+
+## Breaking changes
+
+`ClientConnection.init()` no longer tries discovery automatically. Discovery should be triggered explicitly from the `MCPClientManager` after setting the server to the `DISCOVERING` state. For most use cases, this is handled automatically by `addMcpServer()`, but if you are using the lower-level APIs, you may need to call `discoverIfConnected()` explicitly.
+
+Learn more in the [MCP Client API reference](/agents/model-context-protocol/mcp-client-api/).

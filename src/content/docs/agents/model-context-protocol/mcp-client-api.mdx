@@ -229,16 +229,24 @@ export class MyAgent extends Agent<Env, never> {
 
 </TypeScriptExample>
 
-The `state` field indicates the connection status:
+#### Connection States
+
+The `state` field indicates the current connection status:
 
 - **`authenticating`** — Waiting for OAuth authorization to complete
 - **`connecting`** — Establishing transport connection to MCP server
 - **`connected`** — Transport connection established, but capabilities not yet discovered
 - **`discovering`** — Discovering server capabilities (tools, resources, prompts)
-- **`ready`** — Fully connected and ready to use
-- **`failed`** — Connection failed at some point
+- **`ready`** — Fully connected with all capabilities discovered and available
+- **`failed`** — Connection failed (check observability events for error details)
 
 Use this method to monitor connection status, list available tools, or build UI for connected servers.
+
+:::note[Connection State Changes]
+
+Starting from version 0.0.24, the connection flow includes a new `connected` state to distinguish between transport connection and capability discovery. This allows for better control over when tool discovery occurs.
+
+:::
 
 ### `discoverIfConnected()`
 
