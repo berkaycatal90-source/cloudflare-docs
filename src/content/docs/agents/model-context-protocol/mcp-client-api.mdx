@@ -193,8 +193,9 @@ An `MCPServersState` object containing:
 			state:
 				| "authenticating"
 				| "connecting"
-				| "ready"
+				| "connected"
 				| "discovering"
+				| "ready"
 				| "failed";
 			capabilities: ServerCapabilities | null;
 			instructions: string | null;
@@ -228,7 +229,63 @@ export class MyAgent extends Agent<Env, never> {
 
 </TypeScriptExample>
 
-The `state` field can be: `authenticating`, `connecting`, `ready`, `discovering`, or `failed`. Use this method to monitor connection status, list available tools, or build UI for connected servers.
+The `state` field indicates the connection status:
+
+- **`authenticating`** — Waiting for OAuth authorization to complete
+- **`connecting`** — Establishing transport connection to MCP server
+- **`connected`** — Transport connection established, but capabilities not yet discovered
+- **`discovering`** — Discovering server capabilities (tools, resources, prompts)
+- **`ready`** — Fully connected and ready to use
+- **`failed`** — Connection failed at some point
+
+Use this method to monitor connection status, list available tools, or build UI for connected servers.
+
+### `discoverIfConnected()`
+
+Discover server capabilities if the connection is in the `connected` state. This method transitions the connection from `connected` to `discovering` to `ready`.
+
+```ts
+async discoverIfConnected(serverId: string): Promise<void>
+```
+
+#### Parameters
+
+- **`serverId`** (string, required) — Server connection ID returned from `addMcpServer()`
+
+#### Returns
+
+A Promise that resolves when discovery is complete (or immediately if the connection is not in the `connected` state).
+
+#### Example
+
+<TypeScriptExample>
+
+```ts title="src/index.ts"
+export class MyAgent extends Agent<Env, never> {
+	async onRequest(request: Request): Promise<Response> {
+		const url = new URL(request.url);
+
+		if (url.pathname === "/refresh" && request.method === "POST") {
+			const { serverId } = await request.json();
+
+			// Force refresh of server capabilities
+			await this.mcp.discoverIfConnected(serverId);
+
+			return new Response("Capabilities refreshed", { status: 200 });
+		}
+	}
+}
+```
+
+</TypeScriptExample>
+
+This method is useful for refreshing server capabilities (for example, from a UI refresh button) or when you need to manually trigger discovery after a connection has been established.
+
+:::note[Automatic Discovery]
+
+In most cases, you do not need to call this method directly. When you call `addMcpServer()`, the connection automatically discovers capabilities for non-OAuth connections. For OAuth connections, discovery happens automatically after the OAuth flow completes.
+
+:::
 
 ## OAuth Configuration
 
@@ -277,6 +334,12 @@ export class MyAgent extends Agent<Env, never> {
 ```
 
 </TypeScriptExample>
+
+:::note[Discovery Failures]
+
+MCP client discovery failures now throw errors immediately instead of continuing with empty arrays. This means that if a server fails to respond during capability discovery (tools, resources, prompts), the connection will transition to the `failed` state and throw an error. This provides faster feedback and prevents silent failures.
+
+:::
 
 ## Next Steps
 
